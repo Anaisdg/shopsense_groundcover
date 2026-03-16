@@ -1,0 +1,15 @@
+apiVersion: kustomize.build/v1beta1
+kind: Kustomization
+
+namespace: shopsense
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - gateway.yaml
+  - catalog.yaml
+  - recommendation.yaml
+  - orders.yaml
+
+commonLabels:
+  app: shopsense
