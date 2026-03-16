@@ -1,12 +1,31 @@
+import asyncio
 import json
 import os
+import random
 import time
 
 import httpx
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from pydantic import BaseModel
 
 app = FastAPI(title="ShopSense Recommendation", version="1.0.0")
+
+chaos_config: dict[str, float] = {"latency_ms": 0, "error_rate": 0.0}
+
+
+@app.middleware("http")
+async def chaos_middleware(request: Request, call_next: object) -> Response:
+    if not request.url.path.startswith("/chaos"):
+        if chaos_config["latency_ms"] > 0:
+            await asyncio.sleep(chaos_config["latency_ms"] / 1000)
+        if chaos_config["error_rate"] > 0 and random.random() < chaos_config["error_rate"]:
+            return Response(
+                content='{"detail": "Chaos-induced error"}',
+                status_code=500,
+                media_type="application/json",
+            )
+    response: Response = await call_next(request)  # type: ignore[misc]
+    return response
 
 CATALOG_URL = os.environ.get("CATALOG_URL", "http://localhost:8001")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
@@ -207,3 +226,35 @@ async def recommend(req: RecommendRequest) -> RecommendResponse:
         total_latency_ms=round(total_latency, 2),
         source=source,
     )
+
+
+class ChaosLatencyRequest(BaseModel):
+    ms: float = 0
+
+
+class ChaosErrorRequest(BaseModel):
+    rate: float = 0
+
+
+@app.post("/chaos/latency")
+async def set_chaos_latency(req: ChaosLatencyRequest) -> dict[str, object]:
+    chaos_config["latency_ms"] = req.ms
+    return {"status": "ok", "latency_ms": req.ms}
+
+
+@app.post("/chaos/error")
+async def set_chaos_error(req: ChaosErrorRequest) -> dict[str, object]:
+    chaos_config["error_rate"] = max(0.0, min(1.0, req.rate))
+    return {"status": "ok", "error_rate": chaos_config["error_rate"]}
+
+
+@app.post("/chaos/reset")
+async def reset_chaos() -> dict[str, str]:
+    chaos_config["latency_ms"] = 0
+    chaos_config["error_rate"] = 0.0
+    return {"status": "ok"}
+
+
+@app.get("/chaos/status")
+async def chaos_status() -> dict[str, object]:
+    return {"service": "recommendation", **chaos_config}

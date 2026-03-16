@@ -1,12 +1,17 @@
+import asyncio
 import logging
 import os
+import random
 import time
 
 import httpx
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 app = FastAPI(title="ShopSense Gateway", version="1.0.0")
+
+chaos_config: dict[str, float] = {"latency_ms": 0, "error_rate": 0.0}
 
 app.add_middleware(
     CORSMiddleware,
@@ -32,6 +37,15 @@ SERVICE_MAP: dict[str, str] = {
 
 @app.middleware("http")
 async def log_requests(request: Request, call_next: object) -> Response:
+    if not request.url.path.startswith("/chaos") and not request.url.path.startswith("/api/chaos"):
+        if chaos_config["latency_ms"] > 0:
+            await asyncio.sleep(chaos_config["latency_ms"] / 1000)
+        if chaos_config["error_rate"] > 0 and random.random() < chaos_config["error_rate"]:
+            return Response(
+                content='{"detail": "Chaos-induced error"}',
+                status_code=500,
+                media_type="application/json",
+            )
     start = time.perf_counter()
     response: Response = await call_next(request)  # type: ignore[misc]
     duration_ms = (time.perf_counter() - start) * 1000
@@ -125,3 +139,92 @@ async def proxy_recommend(request: Request, path: str) -> Response:
 @app.api_route("/api/recommend", methods=["GET", "POST"])
 async def proxy_recommend_root(request: Request) -> Response:
     return await _proxy(request, "recommend", "recommend")
+
+
+# --- Chaos endpoints for gateway itself ---
+
+class ChaosLatencyRequest(BaseModel):
+    ms: float = 0
+
+
+class ChaosErrorRequest(BaseModel):
+    rate: float = 0
+
+
+@app.post("/chaos/latency")
+async def set_chaos_latency(req: ChaosLatencyRequest) -> dict[str, object]:
+    chaos_config["latency_ms"] = req.ms
+    return {"status": "ok", "latency_ms": req.ms}
+
+
+@app.post("/chaos/error")
+async def set_chaos_error(req: ChaosErrorRequest) -> dict[str, object]:
+    chaos_config["error_rate"] = max(0.0, min(1.0, req.rate))
+    return {"status": "ok", "error_rate": chaos_config["error_rate"]}
+
+
+@app.post("/chaos/reset")
+async def reset_chaos() -> dict[str, str]:
+    chaos_config["latency_ms"] = 0
+    chaos_config["error_rate"] = 0.0
+    return {"status": "ok"}
+
+
+@app.get("/chaos/status")
+async def chaos_status() -> dict[str, object]:
+    return {"service": "gateway", **chaos_config}
+
+
+# --- Pre-built chaos scenarios via gateway ---
+
+SCENARIOS: dict[str, list[dict[str, object]]] = {
+    "slow-checkout": [
+        {"url": f"{ORDERS_URL}/chaos/latency", "body": {"ms": 3000}},
+        {"url": f"{CATALOG_URL}/chaos/latency", "body": {"ms": 1500}},
+    ],
+    "flaky-recommendations": [
+        {"url": f"{RECOMMENDATION_URL}/chaos/error", "body": {"rate": 0.5}},
+        {"url": f"{RECOMMENDATION_URL}/chaos/latency", "body": {"ms": 2000}},
+    ],
+    "cascade-failure": [
+        {"url": f"{CATALOG_URL}/chaos/error", "body": {"rate": 0.7}},
+        {"url": f"{CATALOG_URL}/chaos/latency", "body": {"ms": 5000}},
+        {"url": f"{ORDERS_URL}/chaos/error", "body": {"rate": 0.3}},
+        {"url": f"{RECOMMENDATION_URL}/chaos/error", "body": {"rate": 0.5}},
+    ],
+}
+
+
+@app.post("/api/chaos/scenario/{scenario_name}")
+async def trigger_scenario(scenario_name: str) -> dict[str, object]:
+    actions = SCENARIOS.get(scenario_name)
+    if not actions:
+        raise HTTPException(status_code=404, detail=f"Unknown scenario: {scenario_name}. Available: {list(SCENARIOS.keys())}")
+
+    results: list[dict[str, object]] = []
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for action in actions:
+            try:
+                resp = await client.post(str(action["url"]), json=action["body"])
+                results.append({"url": str(action["url"]), "status": resp.status_code})
+            except httpx.RequestError as e:
+                results.append({"url": str(action["url"]), "error": str(e)})
+
+    return {"scenario": scenario_name, "status": "activated", "results": results}
+
+
+@app.post("/api/chaos/reset")
+async def reset_all_chaos() -> dict[str, object]:
+    chaos_config["latency_ms"] = 0
+    chaos_config["error_rate"] = 0.0
+
+    results: list[dict[str, object]] = []
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        for name, url in [("catalog", CATALOG_URL), ("recommendation", RECOMMENDATION_URL), ("orders", ORDERS_URL)]:
+            try:
+                resp = await client.post(f"{url}/chaos/reset")
+                results.append({"service": name, "status": resp.status_code})
+            except httpx.RequestError:
+                results.append({"service": name, "error": "unavailable"})
+
+    return {"status": "all chaos reset", "results": results}
