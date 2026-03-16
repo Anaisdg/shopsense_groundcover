@@ -17,7 +17,7 @@
         "All services start without errors via docker-compose up"
       ],
       "priority": 1,
-      "passes": false,
+      "passes": true,
       "notes": "Gateway=8000, Catalog=8001, Recommendation=8002, Orders=8003"
     },
     {
@@ -34,7 +34,7 @@
         "Typecheck passes (use type hints throughout)"
       ],
       "priority": 2,
-      "passes": false,
+      "passes": true,
       "notes": "Use Pydantic models. Keep it simple with in-memory storage - no database needed for demo."
     },
     {
@@ -51,7 +51,7 @@
         "All inter-service calls use httpx with proper error handling"
       ],
       "priority": 3,
-      "passes": false,
+      "passes": true,
       "notes": "Inter-service calls to catalog service at http://catalog:8001. This creates distributed traces."
     },
     {
@@ -68,7 +68,7 @@
         "GET /recommend/health includes LLM connectivity status"
       ],
       "priority": 4,
-      "passes": false,
+      "passes": true,
       "notes": "Use OPENAI_API_KEY and OPENAI_BASE_URL env vars. Default to a mock/fallback mode for easy demo without real API key."
     },
     {
@@ -83,7 +83,7 @@
         "Proper error handling when downstream services are unavailable (503 with service name)"
       ],
       "priority": 5,
-      "passes": false,
+      "passes": true,
       "notes": "Gateway is the single entry point. All client requests go through it."
     },
     {
@@ -99,7 +99,7 @@
         "Gateway gets POST /api/chaos/scenario endpoints for pre-built scenarios: 'slow-checkout', 'flaky-recommendations', 'cascade-failure'"
       ],
       "priority": 6,
-      "passes": false,
+      "passes": true,
       "notes": "This is KEY for demos. Pre-built scenarios make live presentations smooth."
     },
     {
@@ -115,7 +115,7 @@
         "Can run continuously or for a fixed duration"
       ],
       "priority": 7,
-      "passes": false,
+      "passes": true,
       "notes": "This generates the telemetry data that makes Groundcover dashboards look great during demos."
     },
     {
@@ -132,7 +132,7 @@
         "Kustomization.yaml for easy deployment"
       ],
       "priority": 8,
-      "passes": false,
+      "passes": true,
       "notes": "Proper K8s labels are important - Groundcover uses them for service map visualization."
     },
     {
@@ -149,7 +149,7 @@
         "Clean, modern CSS (no framework needed, just looks decent)"
       ],
       "priority": 9,
-      "passes": false,
+      "passes": true,
       "notes": "Keep it simple - single HTML file with vanilla JS. This is for demos, not production."
     },
     {
@@ -164,7 +164,7 @@
         "Screenshots placeholder section"
       ],
       "priority": 10,
-      "passes": false,
+      "passes": true,
       "notes": "The README is critical for DevRel - it's what people see first on GitHub."
     }
   ]

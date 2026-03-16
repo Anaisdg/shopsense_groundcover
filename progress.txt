@@ -1,0 +1,93 @@
+# Ralph Progress Log
+Started: Mon Mar 16 12:56:08 CDT 2026
+---
+
+## 2026-03-16 - US-001
+- Scaffolded all 4 FastAPI services with health check endpoints
+- Created Dockerfiles (python:3.11-slim), requirements.txt, and docker-compose.yml
+- Files changed: services/{gateway,catalog,recommendation,orders}/{main.py,requirements.txt,Dockerfile}, docker-compose.yml
+- **Learnings for future iterations:**
+  - Directory structure was pre-created but empty; just needed to add files
+  - .gitignore already existed from initial commit
+  - docker-compose service names match directory names for easy inter-service DNS
+---
+
+## 2026-03-16 - US-002
+- Implemented Product model with Pydantic, 20 seed products across 4 categories
+- Added GET /products (with category filter), GET /products/{id}, GET /products/search?q=
+- Files changed: services/catalog/main.py
+- **Learnings for future iterations:**
+  - Used in-memory dict for storage; product IDs follow {category_prefix}-{num} pattern
+  - Search endpoint must be defined before /{id} route to avoid path conflicts in FastAPI
+---
+
+## 2026-03-16 - US-003
+- Implemented cart CRUD: create, add items, get cart, checkout
+- Inter-service calls to catalog for product validation and stock checks
+- Files changed: services/orders/main.py
+- **Learnings for future iterations:**
+  - Used httpx.AsyncClient with 5s timeout for inter-service calls
+  - Checkout verifies stock and refreshes prices from catalog before confirming
+  - Cart is deleted after successful checkout
+---
+
+## 2026-03-16 - US-004
+- Implemented POST /recommend with LLM integration and keyword-based fallback
+- GET /recommend/health includes LLM connectivity status
+- Response includes timing metadata (llm_latency_ms, total_latency_ms, source)
+- Files changed: services/recommendation/main.py
+- **Learnings for future iterations:**
+  - Fallback uses category matching + keyword overlap scoring
+  - LLM response parsing strips markdown code fences if present
+  - OPENAI_API_KEY empty string triggers fallback mode
+---
+
+## 2026-03-16 - US-005
+- Implemented API Gateway with proxy routing to all 3 backend services
+- CORS middleware (allow all origins), request logging middleware, aggregated health endpoint
+- 503 error handling when downstream services unavailable
+- Files changed: services/gateway/main.py
+- **Learnings for future iterations:**
+  - Used api_route with path:path capture for flexible proxying
+  - Need both root and path variants for each proxy route in FastAPI
+  - Logging middleware uses perf_counter for accurate duration_ms
+---
+
+## 2026-03-16 - US-006
+- Added chaos middleware + endpoints to all 4 services (latency, error, reset, status)
+- Gateway gets pre-built scenario endpoints: slow-checkout, flaky-recommendations, cascade-failure
+- POST /api/chaos/reset resets all services at once
+- Files changed: all 4 main.py files
+- **Learnings for future iterations:**
+  - Chaos middleware skips /chaos paths to avoid breaking chaos control itself
+  - Scenarios are data-driven dicts mapping to service chaos endpoints
+---
+
+## 2026-03-16 - US-007
+- Created scripts/loadgen.py with full user journey simulation
+- Supports --rps, --duration, --gateway-url flags
+- Prints summary stats: total, error rate, p50/p95/p99 latency
+- Files changed: scripts/loadgen.py
+---
+
+## 2026-03-16 - US-008
+- Created K8s manifests: namespace, configmap, deployments (2 replicas each), services
+- Gateway gets LoadBalancer, others get ClusterIP
+- All resources labeled with app, service, version for Groundcover service map
+- Kustomization.yaml for easy deployment
+- Files changed: k8s/{namespace,configmap,gateway,catalog,recommendation,orders,kustomization}.yaml
+---
+
+## 2026-03-16 - US-009
+- Created single HTML file at services/gateway/static/index.html
+- Product grid, search, category filter, recommendations modal, cart + checkout
+- Chaos control panel (collapsible) for triggering demo scenarios
+- Gateway serves index.html at GET /
+- Files changed: services/gateway/static/index.html, services/gateway/main.py
+---
+
+## 2026-03-16 - US-010
+- Created README.md with architecture diagram, quick start, demo script, Groundcover guide
+- Includes environment variables table, API reference, screenshots placeholder
+- Files changed: README.md
+---
