@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ShopSense</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f5f5f5; color: #333; }
+        header { background: #1a1a2e; color: white; padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center; }
+        header h1 { font-size: 1.5rem; }
+        .cart-badge { background: #e94560; padding: 0.3rem 0.8rem; border-radius: 20px; cursor: pointer; font-size: 0.9rem; }
+        .search-bar { padding: 1rem 2rem; background: white; border-bottom: 1px solid #ddd; }
+        .search-bar input { width: 100%; max-width: 600px; padding: 0.6rem 1rem; border: 2px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        .search-bar input:focus { outline: none; border-color: #e94560; }
+        .categories { padding: 0.5rem 2rem; display: flex; gap: 0.5rem; flex-wrap: wrap; background: white; border-bottom: 1px solid #ddd; }
+        .categories button { padding: 0.4rem 1rem; border: 1px solid #ddd; border-radius: 20px; background: white; cursor: pointer; font-size: 0.85rem; }
+        .categories button.active { background: #1a1a2e; color: white; border-color: #1a1a2e; }
+        main { max-width: 1200px; margin: 2rem auto; padding: 0 2rem; }
+        .product-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 1.5rem; }
+        .product-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); transition: transform 0.2s; cursor: pointer; }
+        .product-card:hover { transform: translateY(-4px); box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+        .product-card .img-placeholder { background: #e8e8e8; height: 180px; display: flex; align-items: center; justify-content: center; font-size: 3rem; }
+        .product-card .info { padding: 1rem; }
+        .product-card .name { font-weight: 600; margin-bottom: 0.3rem; }
+        .product-card .desc { font-size: 0.85rem; color: #666; margin-bottom: 0.5rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .product-card .bottom { display: flex; justify-content: space-between; align-items: center; }
+        .product-card .price { font-size: 1.1rem; font-weight: 700; color: #e94560; }
+        .product-card .stock { font-size: 0.75rem; color: #999; }
+        .btn { padding: 0.5rem 1rem; background: #e94560; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; }
+        .btn:hover { background: #c73e54; }
+        .btn-sm { padding: 0.3rem 0.7rem; font-size: 0.8rem; }
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal-overlay.active { display: flex; }
+        .modal { background: white; border-radius: 12px; padding: 2rem; max-width: 500px; width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal h2 { margin-bottom: 1rem; }
+        .modal .close { float: right; font-size: 1.5rem; cursor: pointer; background: none; border: none; }
+        .rec-list { list-style: none; padding: 0; }
+        .rec-list li { padding: 0.8rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .rec-list .reasoning { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
+        .cart-items { list-style: none; padding: 0; }
+        .cart-items li { padding: 0.8rem; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; }
+        .cart-total { font-size: 1.2rem; font-weight: 700; text-align: right; margin: 1rem 0; }
+        .chaos-panel { position: fixed; bottom: 0; right: 0; background: #1a1a2e; color: white; border-radius: 12px 0 0 0; z-index: 50; }
+        .chaos-toggle { padding: 0.5rem 1rem; cursor: pointer; display: flex; align-items: center; gap: 0.5rem; font-size: 0.85rem; }
+        .chaos-content { display: none; padding: 1rem; min-width: 250px; }
+        .chaos-content.active { display: block; }
+        .chaos-content button { display: block; width: 100%; margin: 0.3rem 0; padding: 0.5rem; border: 1px solid #444; background: #2a2a4e; color: white; border-radius: 6px; cursor: pointer; text-align: left; font-size: 0.85rem; }
+        .chaos-content button:hover { background: #e94560; }
+        .status-msg { padding: 0.5rem; font-size: 0.8rem; color: #8f8; }
+        .loading { text-align: center; padding: 2rem; color: #999; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>ShopSense</h1>
+        <div class="cart-badge" onclick="openCart()">Cart (<span id="cart-count">0</span>)</div>
+    </header>
+    <div class="search-bar">
+        <input type="text" id="search-input" placeholder="Search products..." onkeyup="handleSearch(event)">
+    </div>
+    <div class="categories">
+        <button class="active" onclick="filterCategory(this, '')">All</button>
+        <button onclick="filterCategory(this, 'electronics')">Electronics</button>
+        <button onclick="filterCategory(this, 'clothing')">Clothing</button>
+        <button onclick="filterCategory(this, 'home')">Home</button>
+        <button onclick="filterCategory(this, 'food')">Food</button>
+    </div>
+    <main>
+        <div class="product-grid" id="product-grid"></div>
+    </main>
+
+    <div class="modal-overlay" id="rec-modal">
+        <div class="modal">
+            <button class="close" onclick="closeModal('rec-modal')">&times;</button>
+            <h2>Recommended For You</h2>
+            <div id="rec-loading" class="loading">Loading recommendations...</div>
+            <ul class="rec-list" id="rec-list"></ul>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="cart-modal">
+        <div class="modal">
+            <button class="close" onclick="closeModal('cart-modal')">&times;</button>
+            <h2>Your Cart</h2>
+            <ul class="cart-items" id="cart-items"></ul>
+            <div class="cart-total" id="cart-total"></div>
+            <button class="btn" onclick="checkout()" id="checkout-btn" style="width:100%">Checkout</button>
+        </div>
+    </div>
+
+    <div class="chaos-panel">
+        <div class="chaos-toggle" onclick="toggleChaos()">Chaos Control Panel</div>
+        <div class="chaos-content" id="chaos-content">
+            <button onclick="triggerScenario('slow-checkout')">Slow Checkout</button>
+            <button onclick="triggerScenario('flaky-recommendations')">Flaky Recommendations</button>
+            <button onclick="triggerScenario('cascade-failure')">Cascade Failure</button>
+            <button onclick="resetChaos()" style="background:#2e7d32">Reset All</button>
+            <div class="status-msg" id="chaos-status"></div>
+        </div>
+    </div>
+
+    <script>
+        const API = '';
+        let cartId = null;
+        let cartItems = [];
+        const EMOJIS = { electronics: '🔌', clothing: '👕', home: '🏠', food: '🍫' };
+
+        async function loadProducts(category = '', query = '') {
+            const grid = document.getElementById('product-grid');
+            grid.innerHTML = '<div class="loading">Loading...</div>';
+            try {
+                let url = `${API}/api/products`;
+                if (query) url = `${API}/api/products/search?q=${encodeURIComponent(query)}`;
+                else if (category) url += `?category=${category}`;
+                const resp = await fetch(url);
+                const products = await resp.json();
+                grid.innerHTML = products.map(p => `
+                    <div class="product-card" onclick="showRecommendations('${p.id}')">
+                        <div class="img-placeholder">${EMOJIS[p.category] || '📦'}</div>
+                        <div class="info">
+                            <div class="name">${p.name}</div>
+                            <div class="desc">${p.description}</div>
+                            <div class="bottom">
+                                <span class="price">$${p.price.toFixed(2)}</span>
+                                <span class="stock">${p.stock} in stock</span>
+                            </div>
+                            <button class="btn btn-sm" style="margin-top:0.5rem;width:100%" onclick="event.stopPropagation();addToCart('${p.id}')">Add to Cart</button>
+                        </div>
+                    </div>
+                `).join('');
+            } catch (e) {
+                grid.innerHTML = '<div class="loading">Failed to load products</div>';
+            }
+        }
+
+        function handleSearch(e) {
+            if (e.key === 'Enter') {
+                const q = e.target.value.trim();
+                if (q) loadProducts('', q);
+                else loadProducts();
+            }
+        }
+
+        function filterCategory(btn, cat) {
+            document.querySelectorAll('.categories button').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('search-input').value = '';
+            loadProducts(cat);
+        }
+
+        async function ensureCart() {
+            if (!cartId) {
+                const resp = await fetch(`${API}/api/cart`, { method: 'POST' });
+                const cart = await resp.json();
+                cartId = cart.id;
+                cartItems = [];
+            }
+        }
+
+        async function addToCart(productId) {
+            await ensureCart();
+            const resp = await fetch(`${API}/api/cart/${cartId}/items`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ product_id: productId, quantity: 1 })
+            });
+            if (resp.ok) {
+                const cart = await resp.json();
+                cartItems = cart.items;
+                document.getElementById('cart-count').textContent = cartItems.reduce((s, i) => s + i.quantity, 0);
+            }
+        }
+
+        function openCart() {
+            const list = document.getElementById('cart-items');
+            const total = document.getElementById('cart-total');
+            if (!cartItems.length) {
+                list.innerHTML = '<li>Cart is empty</li>';
+                total.textContent = '';
+                document.getElementById('checkout-btn').style.display = 'none';
+            } else {
+                list.innerHTML = cartItems.map(i => `
+                    <li><span>${i.product_id} x${i.quantity}</span><span>$${(i.price * i.quantity).toFixed(2)}</span></li>
+                `).join('');
+                const t = cartItems.reduce((s, i) => s + i.price * i.quantity, 0);
+                total.textContent = `Total: $${t.toFixed(2)}`;
+                document.getElementById('checkout-btn').style.display = 'block';
+            }
+            document.getElementById('cart-modal').classList.add('active');
+        }
+
+        async function checkout() {
+            if (!cartId) return;
+            const resp = await fetch(`${API}/api/cart/${cartId}/checkout`, { method: 'POST' });
+            if (resp.ok) {
+                const order = await resp.json();
+                alert(`Order confirmed! ID: ${order.order_id}\nTotal: $${order.total.toFixed(2)}`);
+                cartId = null;
+                cartItems = [];
+                document.getElementById('cart-count').textContent = '0';
+                closeModal('cart-modal');
+            } else {
+                const err = await resp.json();
+                alert(`Checkout failed: ${err.detail}`);
+            }
+        }
+
+        async function showRecommendations(productId) {
+            document.getElementById('rec-modal').classList.add('active');
+            document.getElementById('rec-loading').style.display = 'block';
+            document.getElementById('rec-list').innerHTML = '';
+            try {
+                const resp = await fetch(`${API}/api/recommend`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ product_ids: [productId] })
+                });
+                const data = await resp.json();
+                document.getElementById('rec-loading').style.display = 'none';
+                document.getElementById('rec-list').innerHTML = data.recommendations.map(r => `
+                    <li>
+                        <div>
+                            <strong>${r.name}</strong> - $${r.price.toFixed(2)}
+                            <div class="reasoning">${r.reasoning}</div>
+                        </div>
+                        <button class="btn btn-sm" onclick="addToCart('${r.product_id}')">Add</button>
+                    </li>
+                `).join('') + `<li style="color:#999;font-size:0.75rem">Source: ${data.source} | LLM: ${data.llm_latency_ms}ms | Total: ${data.total_latency_ms}ms</li>`;
+            } catch (e) {
+                document.getElementById('rec-loading').textContent = 'Failed to load recommendations';
+            }
+        }
+
+        function closeModal(id) { document.getElementById(id).classList.remove('active'); }
+
+        function toggleChaos() { document.getElementById('chaos-content').classList.toggle('active'); }
+
+        async function triggerScenario(name) {
+            const resp = await fetch(`${API}/api/chaos/scenario/${name}`, { method: 'POST' });
+            const data = await resp.json();
+            document.getElementById('chaos-status').textContent = `${name}: ${data.status}`;
+        }
+
+        async function resetChaos() {
+            await fetch(`${API}/api/chaos/reset`, { method: 'POST' });
+            document.getElementById('chaos-status').textContent = 'All chaos reset';
+        }
+
+        loadProducts();
+    </script>
+</body>
+</html>

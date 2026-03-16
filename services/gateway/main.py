@@ -3,13 +3,17 @@ import logging
 import os
 import random
 import time
+from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 app = FastAPI(title="ShopSense Gateway", version="1.0.0")
+
+STATIC_DIR = Path(__file__).parent / "static"
 
 chaos_config: dict[str, float] = {"latency_ms": 0, "error_rate": 0.0}
 
@@ -57,6 +61,11 @@ async def log_requests(request: Request, call_next: object) -> Response:
         duration_ms,
     )
     return response
+
+
+@app.get("/")
+async def serve_frontend() -> FileResponse:
+    return FileResponse(STATIC_DIR / "index.html")
 
 
 @app.get("/health")
