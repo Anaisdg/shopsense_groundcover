@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shopsense-config
+  namespace: shopsense
+  labels:
+    app: shopsense
+data:
+  CATALOG_URL: "http://catalog:8001"
+  RECOMMENDATION_URL: "http://recommendation:8002"
+  ORDERS_URL: "http://orders:8003"
+  OPENAI_BASE_URL: "https://api.openai.com/v1"
