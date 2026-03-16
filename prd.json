@@ -1,0 +1,171 @@
+{
+  "project": "ShopSense",
+  "branchName": "ralph/shopsense-mvp",
+  "description": "ShopSense - AI Shopping Assistant demo app for Groundcover DevRel. A microservices architecture (Python/FastAPI) with 4 services designed to generate rich observability telemetry: distributed traces, LLM call monitoring, inter-service communication patterns, and chaos injection for demo scenarios.",
+  "userStories": [
+    {
+      "id": "US-001",
+      "title": "Scaffold monorepo with FastAPI boilerplate",
+      "description": "As a developer, I need the basic project structure with all 4 FastAPI services so I can start building features.",
+      "acceptanceCriteria": [
+        "Create directory structure: services/gateway/, services/catalog/, services/recommendation/, services/orders/",
+        "Each service has a main.py with a FastAPI app, health check endpoint at GET /health returning {status: ok, service: <name>}",
+        "Each service has requirements.txt with fastapi, uvicorn, httpx",
+        "Root docker-compose.yml that builds and runs all 4 services on ports 8000-8003",
+        "Each service has a Dockerfile using python:3.11-slim",
+        "Root .gitignore for Python projects",
+        "All services start without errors via docker-compose up"
+      ],
+      "priority": 1,
+      "passes": false,
+      "notes": "Gateway=8000, Catalog=8001, Recommendation=8002, Orders=8003"
+    },
+    {
+      "id": "US-002",
+      "title": "Product Catalog Service - models and CRUD",
+      "description": "As a user, I need a product catalog so I can browse items in the shop.",
+      "acceptanceCriteria": [
+        "Product model with fields: id, name, description, price, category, image_url, stock",
+        "In-memory store with 20+ seed products across categories (electronics, clothing, home, food)",
+        "GET /products - list all products with optional category filter query param",
+        "GET /products/{id} - get single product",
+        "GET /products/search?q=<query> - text search across name and description",
+        "All endpoints return JSON with proper status codes",
+        "Typecheck passes (use type hints throughout)"
+      ],
+      "priority": 2,
+      "passes": false,
+      "notes": "Use Pydantic models. Keep it simple with in-memory storage - no database needed for demo."
+    },
+    {
+      "id": "US-003",
+      "title": "Order Service - cart and checkout",
+      "description": "As a user, I need to add items to a cart and check out so I can complete a purchase flow.",
+      "acceptanceCriteria": [
+        "Cart model: id, items (product_id, quantity, price), created_at",
+        "POST /cart - create a new cart, returns cart_id",
+        "POST /cart/{cart_id}/items - add item to cart (validates product exists by calling catalog service)",
+        "GET /cart/{cart_id} - get cart with items and total",
+        "POST /cart/{cart_id}/checkout - process checkout, returns order confirmation",
+        "Checkout calls catalog service to verify stock and get current prices",
+        "All inter-service calls use httpx with proper error handling"
+      ],
+      "priority": 3,
+      "passes": false,
+      "notes": "Inter-service calls to catalog service at http://catalog:8001. This creates distributed traces."
+    },
+    {
+      "id": "US-004",
+      "title": "Recommendation Service - LLM-powered suggestions",
+      "description": "As a user, I want AI-powered product recommendations so I can discover relevant items.",
+      "acceptanceCriteria": [
+        "POST /recommend endpoint accepting {product_ids: [], preferences: string}",
+        "Calls catalog service to fetch full product details for context",
+        "Uses OpenAI-compatible API (configurable base_url and api_key via env vars) to generate recommendations",
+        "Falls back to simple keyword matching if LLM is unavailable",
+        "Returns top 5 recommended products with reasoning",
+        "Includes timing metadata in response (llm_latency_ms, total_latency_ms)",
+        "GET /recommend/health includes LLM connectivity status"
+      ],
+      "priority": 4,
+      "passes": false,
+      "notes": "Use OPENAI_API_KEY and OPENAI_BASE_URL env vars. Default to a mock/fallback mode for easy demo without real API key."
+    },
+    {
+      "id": "US-005",
+      "title": "API Gateway - request routing",
+      "description": "As a developer, I need a single entry point that routes to all backend services.",
+      "acceptanceCriteria": [
+        "Proxy routes: /api/products/* -> catalog service, /api/cart/* -> order service, /api/recommend/* -> recommendation service",
+        "GET /api/health returns aggregated health from all services",
+        "CORS middleware allowing all origins (demo app)",
+        "Request logging middleware that logs method, path, status, duration_ms",
+        "Proper error handling when downstream services are unavailable (503 with service name)"
+      ],
+      "priority": 5,
+      "passes": false,
+      "notes": "Gateway is the single entry point. All client requests go through it."
+    },
+    {
+      "id": "US-006",
+      "title": "Chaos engineering endpoints",
+      "description": "As a DevRel presenter, I need to inject failures and latency so I can demo Groundcover's alerting and trace analysis.",
+      "acceptanceCriteria": [
+        "Each service gets a POST /chaos/latency endpoint to add artificial delay (ms parameter)",
+        "Each service gets a POST /chaos/error endpoint to make the service return errors (rate parameter 0-1)",
+        "Each service gets a POST /chaos/reset to clear all chaos settings",
+        "GET /chaos/status returns current chaos configuration",
+        "Chaos affects all subsequent requests until reset",
+        "Gateway gets POST /api/chaos/scenario endpoints for pre-built scenarios: 'slow-checkout', 'flaky-recommendations', 'cascade-failure'"
+      ],
+      "priority": 6,
+      "passes": false,
+      "notes": "This is KEY for demos. Pre-built scenarios make live presentations smooth."
+    },
+    {
+      "id": "US-007",
+      "title": "Load generator for demo traffic",
+      "description": "As a DevRel presenter, I need realistic traffic patterns so Groundcover dashboards show interesting data.",
+      "acceptanceCriteria": [
+        "Python script at scripts/loadgen.py",
+        "Simulates user journeys: browse products -> search -> get recommendations -> add to cart -> checkout",
+        "Configurable: --rps (requests per second), --duration (seconds), --gateway-url",
+        "Generates a mix of successful and error-prone requests",
+        "Prints summary statistics when done (total requests, error rate, p50/p95/p99 latency)",
+        "Can run continuously or for a fixed duration"
+      ],
+      "priority": 7,
+      "passes": false,
+      "notes": "This generates the telemetry data that makes Groundcover dashboards look great during demos."
+    },
+    {
+      "id": "US-008",
+      "title": "Kubernetes manifests",
+      "description": "As a developer, I need K8s manifests so I can deploy to a cluster where Groundcover is installed.",
+      "acceptanceCriteria": [
+        "k8s/ directory with manifests for all 4 services",
+        "Each service has: Deployment (2 replicas), Service (ClusterIP), resource limits",
+        "ConfigMap for shared configuration (service URLs, feature flags)",
+        "Gateway gets a LoadBalancer or NodePort service for external access",
+        "Namespace: shopsense",
+        "Labels on all resources: app, service, version (for Groundcover service map)",
+        "Kustomization.yaml for easy deployment"
+      ],
+      "priority": 8,
+      "passes": false,
+      "notes": "Proper K8s labels are important - Groundcover uses them for service map visualization."
+    },
+    {
+      "id": "US-009",
+      "title": "Simple web frontend",
+      "description": "As a demo viewer, I want a visual UI so the demo feels like a real app, not just API calls.",
+      "acceptanceCriteria": [
+        "Single HTML file served by the gateway at GET /",
+        "Product grid showing items from catalog (fetch from /api/products)",
+        "Search bar that calls /api/products/search",
+        "Click product to see AI recommendations (calls /api/recommend)",
+        "Add to cart button and cart view with checkout",
+        "Chaos control panel (collapsible) to trigger demo scenarios",
+        "Clean, modern CSS (no framework needed, just looks decent)"
+      ],
+      "priority": 9,
+      "passes": false,
+      "notes": "Keep it simple - single HTML file with vanilla JS. This is for demos, not production."
+    },
+    {
+      "id": "US-010",
+      "title": "README with demo walkthrough",
+      "description": "As a DevRel user, I need clear docs on how to run the demo and what to show in Groundcover.",
+      "acceptanceCriteria": [
+        "README.md with: project overview, architecture diagram (ASCII), quick start (docker-compose up), K8s deployment guide",
+        "Demo script section: step-by-step walkthrough for a live demo",
+        "What to show in Groundcover section: service map, distributed traces, LLM monitoring, chaos scenarios",
+        "Environment variables reference table",
+        "Screenshots placeholder section"
+      ],
+      "priority": 10,
+      "passes": false,
+      "notes": "The README is critical for DevRel - it's what people see first on GitHub."
+    }
+  ]
+}
